@@ -15,5 +15,27 @@ An end-to-end reproducible econometric pipeline in R evaluating whether disaggre
 ```text
 ├── data/       <- Cleaned monthly series (BCB REST API) and dynamic IBGE expenditure weights (SIDRA API)
 ├── scripts/    <- Modular R pipeline (01_data_collection to 06_tracking_2026)
-├── outputs/    <- Diagnostic tables (Ljung-Box, ADF, KPSS) and high-resolution figures
+├── outputs/    <- Diagnostic tables (Ljung-Box, ADF, KPSS) and figures
 └── reports/    <- Fully reproducible R Markdown paper and rendered HTML report
+```
+
+## How to Reproduce
+1. Clone or download this repository and open the project via `brazilian-inflation-forecasting.Rproj` in RStudio.
+2. Ensure required packages are managed via `pacman` by running in the R Console:
+```r
+if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+pacman::p_load(here, rmarkdown)
+```
+3. Execute the full modular pipeline sequentially:
+```r
+source(here::here("scripts", "01_data_collection.R"))
+source(here::here("scripts", "02_seasonality_analysis.R"))
+source(here::here("scripts", "03_unit_root_tests.R"))
+source(here::here("scripts", "04_sarimax_estimation.R"))
+source(here::here("scripts", "05_forecast_validation.R"))
+source(here::here("scripts", "06_tracking_2026.R"))
+```
+4. Render the comprehensive research report (HTML / PDF):
+```r
+rmarkdown::render(here::here("reports", "report_ipca_forecasting.Rmd"), output_format = "html_document")
+```
