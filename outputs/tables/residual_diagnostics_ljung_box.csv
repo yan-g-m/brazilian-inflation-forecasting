@@ -1,0 +1,11 @@
+model_target,specification,lb_stat_lag12,lb_pvalue_lag12,lb_stat_lag24,lb_pvalue_lag24,residuals_white_noise
+Headline IPCA (Top-Down),"LM w/ ARIMA(1,0,0)(0,0,1)[12] errors",7.78,0.8022,19.09,0.7474,Yes (White Noise)
+Sub-group: Food Beverages,"LM w/ ARIMA(1,0,0)(1,0,0)[12] errors",18.84,0.0925,31.45,0.1413,Yes (White Noise)
+Sub-group: Housing,"LM w/ ARIMA(0,0,0) errors",7.95,0.789,18.24,0.791,Yes (White Noise)
+Sub-group: Household Goods,"LM w/ ARIMA(1,0,2)(0,0,1)[12] errors",3.17,0.9942,13.55,0.9561,Yes (White Noise)
+Sub-group: Apparel,"LM w/ ARIMA(3,0,1)(0,1,1)[12] errors",5.33,0.9462,18.41,0.7826,Yes (White Noise)
+Sub-group: Transportation,"LM w/ ARIMA(1,0,0) errors",6.01,0.9155,17.92,0.8068,Yes (White Noise)
+Sub-group: Health Care,"LM w/ ARIMA(1,0,1)(2,0,0)[12] errors",22.48,0.0325,47.12,0.0032,Serial Correlation
+Sub-group: Personal Exp,"LM w/ ARIMA(1,1,2)(0,0,1)[12] errors",5.21,0.9506,22.69,0.5384,Yes (White Noise)
+Sub-group: Education,"LM w/ ARIMA(2,0,0)(0,1,1)[12] errors",44.73,0,47.28,0.0031,Serial Correlation
+Sub-group: Communication,"LM w/ ARIMA(0,0,2)(0,0,2)[12] errors",10.57,0.5658,17.88,0.8089,Yes (White Noise)

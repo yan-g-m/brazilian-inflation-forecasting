@@ -1,0 +1,11 @@
+series,adf_stat,adf_crit_5pct,adf_pvalue,kpss_stat,kpss_crit_5pct,kpss_pvalue,conclusion
+headline,-5.272,-2.86,0.01,0.166,0.463,0.1,I(0) Stationary
+food_beverages,-5.118,-2.86,0.01,0.174,0.463,0.1,I(0) Stationary
+housing,-5.276,-2.86,0.01,0.123,0.463,0.1,I(0) Stationary
+household_goods,-3.033,-2.86,0.1437,0.126,0.463,0.1,Inconclusive/Non-stationary
+apparel,-2.168,-2.86,0.506,0.218,0.463,0.1,Inconclusive/Non-stationary
+transportation,-5.089,-2.86,0.01,0.069,0.463,0.1,I(0) Stationary
+communication,-6.595,-2.86,0.01,0.081,0.463,0.1,I(0) Stationary
+health_care,-4.73,-2.86,0.01,0.162,0.463,0.1,I(0) Stationary
+personal_exp,-4.475,-2.86,0.01,1.182,0.463,0.01,Inconclusive/Non-stationary
+education,-7.229,-2.86,0.01,0.152,0.463,0.1,I(0) Stationary

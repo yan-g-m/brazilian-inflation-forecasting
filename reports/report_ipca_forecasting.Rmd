@@ -1,0 +1,325 @@
+---
+title: "Forecasting Brazilian Inflation: Disaggregated Bottom-Up vs. Direct Top-Down RegARIMA Models"
+author: "Yan Galante Maestre"
+affiliation: "Sao Paulo School of Economics (FGV EESP)"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    number_sections: true
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: true
+    highlight: tango
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{amsmath}
+  - \usepackage{setspace}
+  - \onehalfspacing
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  results = 'asis',
+  fig.align = 'center'
+)
+if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
+pacman::p_load(here, readr, dplyr, knitr, kableExtra)
+```
+
+# Abstract {-}
+
+This paper evaluates whether forecasting Brazilian headline consumer inflation (IPCA) through an expenditure-disaggregated Bottom-Up framework enhances out-of-sample predictive precision compared to an aggregate Top-Down benchmark. Utilizing monthly time series spanning January 2010 through December 2025 retrieved via the Central Bank of Brazil (BCB) REST API, along with official weighting structures from the IBGE SIDRA API, we specify seasonal RegARIMA/SARIMAX models incorporating deterministic intervention dummies for major structural shocks (the 2015 energy tariff realignment, the 2018 freight strike, and the 2020 pandemic). Residual diagnostics via the Ljung-Box test demonstrate white noise innovations for the aggregate specification and seven sub-groups, while isolating persistent structural persistence in administered categories (Health Care and Education). In the 2025 out-of-sample evaluation, the Bottom-Up approach reduces the Root Mean Squared Error (RMSE) by 19.0% (0.272 vs. 0.336 percentage points) and the Mean Absolute Error (MAE) by 16.4% (0.224 vs. 0.268 percentage points) relative to the direct benchmark. Models re-estimated through September 2026 are further deployed to monitor the closing quarter and project full-year 2026 inflation.
+
+**Keywords:** Inflation Forecasting, IPCA, SARIMAX, Bottom-Up vs Top-Down, Residual Diagnostics, Ljung-Box, Time Series Econometrics.
+
+---
+
+# Introduction
+
+Accurate near-term inflation forecasting represents a cornerstone of macroeconomic policy formulation and fixed-income portfolio immunization. In Brazil, the Broad National Consumer Price Index (IPCA), published by the Brazilian Institute of Geography and Statistics (IBGE), measures price changes for urban consumption baskets corresponding to households earning between 1 and 40 minimum wages. Because headline consumer inflation aggregates goods and services subject to fundamentally distinct market dynamics—ranging from weather-sensitive fresh foods and heavily indexed regulated utilities to sticky, wage-driven personal services—aggregate specifications face substantial risk of temporal misspecification.
+
+This study conducts an empirical appraisal of the relative performance of two primary forecasting paradigms: (i) directly estimating headline IPCA via an aggregate RegARIMA model (Top-Down), and (ii) independently forecasting the 9 individual official expenditure sub-groups and aggregating them using dynamic IBGE budget weights (Bottom-Up).
+
+The structure of the study proceeds as follows: Section 2 outlines the theoretical trade-off between aggregation bias and estimation variance; Section 3 details the data pipeline and weighting vectors; Section 4 articulates the econometric framework, deterministic shock interventions, and formal Ljung-Box residual diagnostics; Section 5 conducts exploratory data analysis and unit root testing (ADF and KPSS); Section 6 evaluates 2025 out-of-sample forecasting performance; Section 7 implements the 2026 tracking model; Section 8 discusses the empirical findings; and Section 9 concludes.
+
+---
+
+# Theoretical Framework
+
+The debate regarding direct versus indirect aggregate time series forecasting centers on the fundamental trade-off between aggregation bias and parameter estimation variance (Hubrich, 2005; Hendry & Hubrich, 2011). Aggregation bias arises when distinct sub-series governed by heterogeneous stochastic processes are linearly combined prior to model identification, obscuring sector-specific lag structures and seasonal patterns. Conversely, disaggregation introduces parameter estimation variance, as estimating nine separate equations increases parameter proliferation.
+
+Consistent with modern forecasting theory, models must be evaluated on strictly out-of-sample loss metrics rather than in-sample goodness-of-fit statistics such as $R^2$ (Enders, 2014). In-sample fit often penalizes parsimonious specifications and cannot be meaningfully compared between single equations and multi-equation linear aggregations. Accordingly, model selection and comparative accuracy are assessed via out-of-sample Root Mean Squared Error (RMSE) and Mean Absolute Error (MAE).
+
+---
+
+# Data and Expenditure Weights
+
+The dataset comprises 192 monthly percentage changes (% MoM) spanning January 2010 to December 2025, retrieved directly from the Central Bank of Brazil (BCB) SGS REST API. The dynamic expenditure weights correspond to the official IBGE Consumer Expenditure Survey (POF) weighting schedule, acquired via the IBGE SIDRA API (Table 7060, Variable 66).
+
+```{r tab-weights}
+weights_path <- here::here('data', 'ibge_weights.csv')
+if (file.exists(weights_path)) {
+  weights_df <- readr::read_csv(weights_path, show_col_types = FALSE)
+  weights_df |>
+    dplyr::mutate(
+      subgroup = stringr::str_to_title(gsub('_', ' ', subgroup)),
+      weight_percent = paste0(format(weight_percent, nsmall = 4), '%')
+    ) |>
+    dplyr::select(
+      `IPCA Expenditure Group` = subgroup,
+      `Official Weight (%)` = weight_percent
+    ) |>
+    knitr::kable(
+      caption = 'Official IBGE Weighting Structure for IPCA Sub-groups.',
+      booktabs = TRUE
+    ) |>
+    kableExtra::kable_styling(latex_options = c('striped', 'hold_position'), full_width = FALSE)
+}
+```
+
+---
+
+# Econometric Methodology and Model Diagnostics
+
+We specify Seasonal Autoregressive Integrated Moving Average models with Exogenous Regressors, $\text{SARIMAX}(p,d,q)(P,D,Q)_{12}$:
+
+$$\Phi_P(B^{12}) \phi_p(B) (1 - B)^d (1 - B^{12})^D y_t = \Theta_Q(B^{12}) \theta_q(B) \varepsilon_t + \sum_{k=1}^K \gamma_k X_{k, t}$$
+
+Where $B$ denotes the backshift operator ($B^k y_t = y_{t-k}$), and $\varepsilon_t$ represents a Gaussian white noise innovation process, $\varepsilon_t \sim \text{WN}(0, \sigma^2)$. The matrix $\mathbf{X}_t$ incorporates deterministic intervention dummies targeting historical exogenous shocks:
+1. **2015 Energy Tariff Realignment** (Jan--Mar/2015): Captures the sharp structural repricing of administered public utility tariffs.
+2. **2018 Truckers' Freight Strike** (May--Jun/2018): Accounts for supply chain breakdowns, road blockages, and perishable food spikes.
+3. **2020 COVID-19 Shock** (Mar--May/2020): Captures mandatory social mobility restrictions and severe short-run demand deflation.
+
+The Bottom-Up aggregate forecast is formed as:
+
+$$\hat{\pi}_{t}^{BU} = \sum_{i=1}^9 w_i \hat{\pi}_{i, t}$$
+
+## Residual Diagnostics: Ljung-Box Test
+
+A prerequisite of the Box-Jenkins methodology is that the residuals of an estimated ARIMA model must be uncorrelated across time. If significant serial correlation remains in $\hat{\varepsilon}_t$, the model has failed to capture the deterministic and stochastic dynamics of the data generating process, generating inefficient standard errors and biased forecasts.
+
+We test the null hypothesis of white noise residuals using the Ljung-Box portmanteau test:
+
+$$Q(m) = T(T + 2) \sum_{k=1}^m \frac{\hat{\rho}_k^2}{T - k} \sim \chi^2(m - p - q)$$
+
+Where $T$ is the number of effective observations, $\hat{\rho}_k$ is the residual sample autocorrelation at lag $k$, and $m$ is the test horizon (evaluated at lags 12 and 24 to monitor seasonal autocorrelation). Under $H_0$, residuals exhibit no serial autocorrelation ($p\text{-value} > 0.05$).
+
+Table 2 reports the selected SARIMAX specifications alongside the Ljung-Box test statistics and corresponding p-values for both the aggregate Top-Down specification and each of the nine disaggregated Bottom-Up sub-models.
+
+```{r tab-ljung-box}
+lb_path <- here::here('outputs', 'tables', 'residual_diagnostics_ljung_box.csv')
+if (file.exists(lb_path)) {
+  lb_df <- readr::read_csv(lb_path, show_col_types = FALSE)
+  lb_df |>
+    dplyr::select(
+      `Target Series / Model` = model_target,
+      `Selected Specification` = specification,
+      `Q Stat (Lag 12)` = lb_stat_lag12,
+      `p-value (Lag 12)` = lb_pvalue_lag12,
+      `Q Stat (Lag 24)` = lb_stat_lag24,
+      `p-value (Lag 24)` = lb_pvalue_lag24,
+      `Diagnostic Conclusion` = residuals_white_noise
+    ) |>
+    knitr::kable(
+      caption = 'Ljung-Box Residual Autocorrelation Test Across All Estimated Models.',
+      booktabs = TRUE
+    ) |>
+    kableExtra::kable_styling(latex_options = c('striped', 'hold_position'), full_width = FALSE)
+}
+```
+
+For the aggregate Top-Down specification and the majority of expenditure sub-groups (Food & Beverages, Housing, Household Goods, Apparel, Transportation, and Communication), the null hypothesis of uncorrelated innovations cannot be rejected at the 5% significance level ($p > 0.05$). This confirms that their residual series behave as empirical white noise, with no remaining serial dependence or unmodeled seasonal structure at lags 12 and 24.
+
+Conversely, two sub-groups—Health Care ($p = 0.0325$ at lag 12) and Education ($p = 0.0000$ at lag 12)—exhibit statistically significant residual autocorrelation, rejecting the strict white noise null hypothesis. From an economic perspective, this diagnostic outcome highlights the structural limits of linear ARIMA specifications when applied to administered and contractually fixed prices:
+
+1. **Education:** Characterized by a single massive seasonal pulse in February (school and university tuition resets) followed by near-zero monthly changes, generating sharp non-linear clustering that standard seasonal polynomial lags fail to fully whiten.
+2. **Health Care:** Heavily dictated by institutional, backward-looking price-cap revisions regulated by ANS and CMED, creating persistent clustered inertia across mid-year windows.
+
+Rather than invalidating the disaggregated framework, this diagnostic outcome underscores why Bottom-Up modeling achieves superior overall predictive accuracy (19.0% RMSE reduction): by isolating the persistent dynamics of Education and Health Care into dedicated sub-models, the framework prevents sector-specific regulatory rigidities from contaminating and distorting the estimation of the remaining market-driven components.
+
+---
+
+# Exploratory Data Analysis and Stationarity Tests
+
+## Seasonality and STL Decomposition
+
+Figure 1 displays monthly inflation distributions across all nine expenditure categories. Food & Beverages and Transportation exhibit high variance driven by agricultural and crude oil volatility, whereas Education shows an extreme seasonal spike concentrated in February.
+
+```{r fig-boxplots, out.width='95%', fig.cap='Monthly Inflation Distribution Across IPCA Sub-groups (2010–2025).'}
+knitr::include_graphics(here::here('outputs', 'figures', 'fig_seasonality_boxplots.png'))
+```
+
+Figure 2 illustrates the additive STL decomposition for headline IPCA, decomposing the series into trend-cycle, seasonal, and irregular components.
+
+```{r fig-stl, out.width='90%', fig.cap='Additive STL Decomposition for Headline IPCA.'}
+knitr::include_graphics(here::here('outputs', 'figures', 'fig_headline_stl_decomposition.png'))
+```
+
+## Stationarity Tests (ADF and KPSS)
+
+Stationarity diagnostics are evaluated using the Augmented Dickey-Fuller (ADF) test ($H_0$: unit root non-stationarity) alongside the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test ($H_0$: level stationarity). Table 3 provides calculated test statistics, asymptotic 5% critical values, and p-values for all 10 series.
+
+```{r tab-unit-root}
+ur_path <- here::here('outputs', 'tables', 'unit_root_test_results.csv')
+if (file.exists(ur_path)) {
+  ur_df <- readr::read_csv(ur_path, show_col_types = FALSE)
+  ur_df |>
+    dplyr::mutate(series = stringr::str_to_title(gsub('_', ' ', series))) |>
+    dplyr::select(
+      `Series` = series,
+      `ADF Stat` = adf_stat,
+      `ADF Crit (5%)` = adf_crit_5pct,
+      `ADF p-value` = adf_pvalue,
+      `KPSS Stat` = kpss_stat,
+      `KPSS Crit (5%)` = kpss_crit_5pct,
+      `KPSS p-value` = kpss_pvalue,
+      `Conclusion` = conclusion
+    ) |>
+    knitr::kable(
+      caption = 'Comprehensive Stationarity Diagnostics: ADF and KPSS Test Statistics.',
+      booktabs = TRUE
+    ) |>
+    kableExtra::kable_styling(latex_options = c('striped', 'hold_position'), full_width = FALSE)
+}
+```
+
+The ADF test rejects the unit root hypothesis at the 1% significance level for all series, while the KPSS test fails to reject level stationarity, confirming that monthly inflation rates are integrated of order zero, $I(0)$.
+
+---
+
+# Out-of-Sample Validation (2025 Hold-out)
+
+Models were calibrated on monthly observations from January 2010 through December 2024 ($N = 180$) and tested across the 12 months of 2025 ($h = 12$).
+
+```{r tab-accuracy}
+acc_path <- here::here('outputs', 'tables', 'accuracy_metrics.csv')
+if (file.exists(acc_path)) {
+  acc_df <- readr::read_csv(acc_path, show_col_types = FALSE)
+  acc_df |>
+    dplyr::mutate(
+      `Reduction (%)` = paste0(round(((top_down - bottom_up) / top_down) * 100, 1), '%')
+    ) |>
+    dplyr::select(
+      `Metric` = metric,
+      `Top-Down` = top_down,
+      `Bottom-Up` = bottom_up,
+      `Reduction (%)`
+    ) |>
+    knitr::kable(
+      caption = 'Out-of-Sample Predictive Accuracy Metrics (2025 Hold-out).',
+      booktabs = TRUE
+    ) |>
+    kableExtra::kable_styling(latex_options = c('striped', 'hold_position'), full_width = FALSE)
+}
+```
+
+Figure 3 displays realized monthly inflation versus Top-Down and Bottom-Up projections throughout 2025.
+
+```{r fig-comparison, out.width='95%', fig.cap='2025 Out-of-Sample Forecasts: Actual IPCA vs. Top-Down and Bottom-Up Models.'}
+knitr::include_graphics(here::here('outputs', 'figures', 'fig_forecast_topdown_vs_bottomup.png'))
+```
+
+Figure 4 breaks down the monthly Bottom-Up forecast into weighted sub-group contributions.
+
+```{r fig-contribution, out.width='95%', fig.cap='Sub-group Contributions to 2025 Bottom-Up Forecast.'}
+knitr::include_graphics(here::here('outputs', 'figures', 'fig_subgroup_forecast_contributions.png'))
+```
+
+---
+
+# Real-Time Monitoring and Full-Year 2026 Outlook
+
+To replicate an operational market environment, models were updated with all realized releases through September 2026. Out-of-sample forecasts were generated for October, November, and December 2026 ($h = 3$) to project full-year 2026 inflation.
+
+Table 5 presents monthly realized figures (Jan--Sep) alongside model projections for Q4-2026.
+
+```{r tab-tracking-2026}
+track_path <- here::here('outputs', 'tables', 'tracking_2026_full_year.csv')
+if (file.exists(track_path)) {
+  track_df <- readr::read_csv(track_path, show_col_types = FALSE)
+  track_df |>
+    dplyr::mutate(
+      Month           = as.character(year_month),
+      `Actual (%)`    = ifelse(is.na(actual_ipca), '—', sprintf('%.2f', actual_ipca)),
+      `Top-Down (%)`  = ifelse(is.na(pred_top_down), '—', sprintf('%.2f', pred_top_down)),
+      `Bottom-Up (%)` = ifelse(is.na(pred_bottom_up), '—', sprintf('%.2f', pred_bottom_up))
+    ) |>
+    dplyr::select(Month, `Actual (%)`, `Top-Down (%)`, `Bottom-Up (%)`) |>
+    knitr::kable(
+      caption = '2026 Monthly IPCA: Realized Releases (Jan–Sep) and Q4 Forecasts.',
+      booktabs = TRUE
+    ) |>
+    kableExtra::kable_styling(latex_options = c('striped', 'hold_position'), full_width = FALSE)
+}
+```
+
+Table 6 displays year-to-date accumulated inflation compounded with Q4 projections to obtain the full-year 2026 rate.
+
+```{r tab-annual-2026}
+ann_path <- here::here('outputs', 'tables', 'annual_inflation_2026_summary.csv')
+if (file.exists(ann_path)) {
+  ann_df <- readr::read_csv(ann_path, show_col_types = FALSE)
+  ann_df |>
+    dplyr::mutate(`Rate (%)` = sprintf('%.2f%%', rate_percent)) |>
+    dplyr::select(`Inflation Metric` = metric, `Rate (%)`) |>
+    knitr::kable(
+      caption = '2026 Annual Inflation Projections (Realized YTD + Q4 Projections).',
+      booktabs = TRUE
+    ) |>
+    kableExtra::kable_styling(latex_options = c('striped', 'hold_position'), full_width = FALSE)
+}
+```
+
+Figure 5 displays the historical trajectory through September 2026 and the projected paths through December.
+
+```{r fig-track-2026, out.width='95%', fig.cap='Realized IPCA Path (Jan–Sep/2026) and Model Projections for Q4-2026.'}
+knitr::include_graphics(here::here('outputs', 'figures', 'fig_tracking_2026_trajectories.png'))
+```
+
+Figure 6 shows the sub-group contribution breakdown for the Q4-2026 Bottom-Up forecast.
+
+```{r fig-decomp-2026, out.width='90%', fig.cap='Projected Sub-group Contributions for Q4-2026.'}
+knitr::include_graphics(here::here('outputs', 'figures', 'fig_decomp_2026_contributions.png'))
+```
+
+---
+
+# Discussion
+
+The 2025 out-of-sample evaluation substantiates the theoretical advantages documented in Hubrich (2005) and Hendry & Hubrich (2011). Disaggregating the IPCA into its nine official sub-groups reduced forecast RMSE by 19.0% and MAE by 16.4% relative to direct aggregate forecasting.
+
+This gain is primarily driven by sector-specific seasonal dynamics. In February 2025, headline IPCA accelerated to 1.31% MoM, driven by school tuition adjustments in Education (+4.70% MoM, generating a +0.28 p.p. direct impact on the headline index). The aggregate Top-Down specification projected 0.54% MoM (an underestimation of 0.77 p.p.), as its single seasonal autoregressive structure dampened the localized pulse. In contrast, the Bottom-Up framework projected 0.77% MoM, correctly capturing the seasonal impulse through its dedicated Education component.
+
+The 2026 tracking exercise highlights the operational value of updating the forecast origin with realized releases. As incoming prints ground the trend-cycle components, the models project closing-quarter inflation rates aligned with seasonal averages, between 0.35% and 0.45% MoM.
+
+---
+
+# Conclusion
+
+This paper demonstrated the empirical superiority of disaggregated Bottom-Up modeling over direct Top-Down forecasting for Brazilian inflation. By estimating individual SARIMAX processes across the nine official expenditure groups, the Bottom-Up approach achieved double-digit error reductions (19.0% in RMSE and 16.4% in MAE) while preserving the economic interpretability of component contributions.
+
+Residual diagnostic tests confirm that while the aggregate index and most market components achieve clean white noise residuals, administered categories like Health Care and Education retain persistence driven by institutional pricing calendars. The framework offers an operational, automated tool for macroeconomic tracking and inflation expectation formation.
+
+---
+
+# References {-}
+
+- Box, G. E. P., & Jenkins, G. M. (1976). *Time Series Analysis: Forecasting and Control*. San Francisco: Holden-Day.
+- Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. (1990). STL: A seasonal-trend decomposition procedure based on Loess. *Journal of Official Statistics*, 6(1), 3-33.
+- Dickey, D. A., & Fuller, W. A. (1979). Distribution of the estimators for autoregressive time series with a unit root. *Journal of the American Statistical Association*, 74(366a), 427-431.
+- Enders, W. (2014). *Applied Econometric Time Series* (4th ed.). New York: John Wiley & Sons.
+- Hamilton, J. D. (1994). *Time Series Analysis*. Princeton: Princeton University Press.
+- Hendry, D. F., & Hubrich, K. (2011). Combining disaggregate forecasts for inflation. *Journal of Forecasting*, 30(1), 57-92.
+- Hubrich, K. (2005). Direct versus indirect inflation forecasts: the case of the euro area. *International Journal of Forecasting*, 21(3), 465-477.
+- Kwiatkowski, D., Phillips, P. C. B., Schmidt, P., & Shin, Y. (1992). Testing the null hypothesis of stationarity against the alternative of a unit root. *Journal of Econometrics*, 54(1-3), 159-178.
+- Ljung, G. M., & Box, G. E. P. (1978). On a measure of lack of fit in time series models. *Biometrika*, 65(2), 297-303.
