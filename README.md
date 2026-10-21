@@ -15,7 +15,7 @@ An end-to-end reproducible econometric pipeline in R evaluating whether disaggre
 ```text
 ├── data/       <- Cleaned monthly series (BCB REST API) and dynamic IBGE expenditure weights (SIDRA API)
 ├── scripts/    <- Modular R pipeline (01_data_collection to 06_tracking_2026)
-├── outputs/    <- Diagnostic tables (Ljung-Box, ADF, KPSS) and high-resolution figures
+├── outputs/    <- Diagnostic tables (Ljung-Box, ADF, KPSS) and figures
 └── reports/    <- Fully reproducible R Markdown paper and rendered HTML report
 ```
 
