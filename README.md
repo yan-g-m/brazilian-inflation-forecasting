@@ -15,11 +15,5 @@ An end-to-end reproducible econometric pipeline in R evaluating whether disaggre
 ```text
 ├── data/       <- Cleaned monthly series (BCB REST API) and dynamic IBGE expenditure weights (SIDRA API)
 ├── scripts/    <- Modular R pipeline (01_data_collection to 06_tracking_2026)
-├── outputs/    <- Diagnostic tables (Ljung-Box, ADF, KPSS) and figures
+├── outputs/    <- Diagnostic tables (Ljung-Box, ADF, KPSS) and high-resolution figures
 └── reports/    <- Fully reproducible R Markdown paper and rendered HTML report
-```
-
-## How to Reproduce
-1. Clone or download this repository.
-2. Open the project in RStudio (`.Rproj`).
-3. Run the complete pipeline via `scripts/` or knit `reports/report_ipca_forecasting.Rmd`.
